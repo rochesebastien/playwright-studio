@@ -72,7 +72,14 @@ Règles de structure :
 - Contexte non-persistant par défaut = user-data-dir temporaire jeté à la
   fermeture. Ne rien « activer », ne rien casser.
 - Proxy : sur Windows, ne rien passer = héritage du proxy système. Pour forcer
-  le direct : `--proxy-server=direct://` (A1) / `proxy: { server: 'direct://' }` (A2).
+  le direct (⚠️ validé empiriquement — voir DECISIONS.md Q1 : `direct://` seul est
+  réécrit en `http://direct` par `normalizeProxySettings()` et casse la navigation) :
+  - **A1** : `--proxy-server=direct:// --proxy-bypass=*` **+** env enfant
+    `PLAYWRIGHT_DISABLE_FORCED_CHROMIUM_PROXIED_LOOPBACK=1` (sinon Playwright ajoute
+    `<-loopback>` à la bypass-list et le trafic localhost passe par le proxy mort).
+    Le serveur bidon est neutralisé par le wildcard `*` qui bypass tous les hôtes
+    → connexions directes, y compris loopback.
+  - **A2** : argument Chromium brut `args: ['--no-proxy-server']`, PAS l'option `proxy`.
   Mode `system` = ne rien passer (héritage assumé, explicite).
 - Ne pas s'appuyer sur `HTTP_PROXY`/`HTTPS_PROXY` pour le proxy navigateur
   (lues par Node, pas appliquées au Chromium lancé).
@@ -200,13 +207,16 @@ execFile(process.execPath, [playwrightCliPath, 'codegen', ...args], {
 - Construction des args (fonction pure exportée `buildCodegenArgs(o: RecorderOptions): string[]`
   — testable unitairement) :
   - `--target <target>` ; `--output <outputPath>`
-  - proxy `direct` → `--proxy-server=direct://`
+  - proxy `direct` → `--proxy-server=direct://` **et** `--proxy-bypass=*` (cf. §4)
   - proxy `manual` → `--proxy-server=<server>` + si bypass `--proxy-bypass=<bypass>`
   - proxy `system` → rien
   - `--viewport-size=<w>,<h>` si viewport ; `--device=<device>` si device
   - `startUrl` en dernier argument positionnel si non vide
   - **Interdits** : `--user-data-dir`, `--save-storage`, `--load-storage`, `--browser` ≠ chromium
 - Nettoyage env enfant : retirer `NODE_OPTIONS`, `ELECTRON_ENABLE_LOGGING`.
+  Ajouter `PLAYWRIGHT_DISABLE_FORCED_CHROMIUM_PROXIED_LOOPBACK=1` (requis pour que
+  le mode direct couvre aussi le loopback, cf. §4 ; sans effet dans les autres modes
+  où l'utilisateur veut de toute façon son proxy, bypass explicite à sa main).
 - Fin de process : exit 0 → état `stopped` + lecture du fichier output pour `codePreview` ;
   exit ≠ 0 → état `error` avec stderr (dernières ~2000 chars).
 - `stop()` → SIGTERM (Windows : `child.kill()`), timeout 5 s puis kill forcé.
@@ -220,7 +230,9 @@ hors `playwright`) :
 execFile(process.execPath, [a2RunnerPath, JSON.stringify(configA2)], { env: idem A1 })
 ```
 
-Le script : `chromium.launch({ headless: false, proxy })` →
+Le script : `chromium.launch({ headless: false, ... })` — mode `direct` via
+`args: ['--no-proxy-server']` (JAMAIS `proxy: { server: 'direct://' }`, cf. §4),
+mode `manual` via l'option `proxy`, mode `system` sans rien →
 `browser.newContext({ viewport, extraHTTPHeaders })` (non-persistant) →
 `page.pause()` (ouvre l'inspecteur). Le code généré se récupère via le bouton
 copy de l'inspecteur (limitation documentée dans DECISIONS.md — pas d'API

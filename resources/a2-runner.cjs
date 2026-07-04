@@ -8,6 +8,7 @@
  *
  * config = {
  *   startUrl?: string,
+ *   noProxyServer?: boolean,  // mode direct : arg Chromium brut --no-proxy-server
  *   proxy?: { server: string, bypass?: string },  // undefined = héritage système
  *   viewport?: { width, height },
  *   extraHeaders?: Record<string,string>,
@@ -32,7 +33,11 @@ async function main() {
   const { chromium } = require('playwright');
 
   const launchOptions = { headless: false };
-  if (config.proxy && config.proxy.server) {
+  if (config.noProxyServer) {
+    // Mode direct : arg Chromium brut. L'option proxy { server: 'direct://' }
+    // serait réécrite en http://direct par Playwright et casserait la navigation.
+    launchOptions.args = ['--no-proxy-server'];
+  } else if (config.proxy && config.proxy.server) {
     launchOptions.proxy = { server: config.proxy.server };
     if (config.proxy.bypass) {
       launchOptions.proxy.bypass = config.proxy.bypass;

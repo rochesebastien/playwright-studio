@@ -28,7 +28,14 @@ export function buildCodegenArgs(o: RecorderOptions): string[] {
 
   switch (o.proxy.mode) {
     case 'direct':
+      // `direct://` seul est réécrit en `http://direct` (proxy inexistant) par
+      // normalizeProxySettings() de Playwright 1.56.1 et casse la navigation.
+      // Le wildcard `--proxy-bypass=*` court-circuite le proxy pour TOUS les
+      // hôtes → connexions directes. Nécessite aussi
+      // PLAYWRIGHT_DISABLE_FORCED_CHROMIUM_PROXIED_LOOPBACK=1 dans l'env enfant
+      // pour couvrir le loopback (cf. buildChildEnv et DECISIONS.md Q1).
       args.push('--proxy-server=direct://');
+      args.push('--proxy-bypass=*');
       break;
     case 'manual':
       if (o.proxy.server) {
@@ -68,6 +75,10 @@ export function buildChildEnv(browsersPath: string): NodeJS.ProcessEnv {
     ...process.env,
     ELECTRON_RUN_AS_NODE: '1',
     PLAYWRIGHT_BROWSERS_PATH: browsersPath,
+    // Sans ceci, Playwright ajoute `<-loopback>` à la bypass-list dès qu'un
+    // proxy est passé : le trafic localhost passerait alors par le proxy
+    // factice du mode direct et échouerait (DECISIONS.md Q1).
+    PLAYWRIGHT_DISABLE_FORCED_CHROMIUM_PROXIED_LOOPBACK: '1',
   };
   delete env.NODE_OPTIONS;
   delete env.ELECTRON_ENABLE_LOGGING;
@@ -77,6 +88,8 @@ export function buildChildEnv(browsersPath: string): NodeJS.ProcessEnv {
 /** Config JSON passée au script A2. */
 interface A2Config {
   startUrl?: string;
+  /** Mode direct : argument Chromium brut --no-proxy-server (jamais l'option proxy). */
+  noProxyServer?: boolean;
   proxy?: { server: string; bypass?: string };
   viewport?: { width: number; height: number };
   extraHeaders?: Record<string, string>;
@@ -89,7 +102,10 @@ function resolveA2Proxy(
 ): { server: string; bypass?: string } | undefined {
   switch (o.proxy.mode) {
     case 'direct':
-      return { server: 'direct://' };
+      // Le direct passe par noProxyServer (arg brut), pas par l'option proxy
+      // — `{ server: 'direct://' }` serait réécrit en `http://direct` et
+      // casserait la navigation (DECISIONS.md Q1).
+      return undefined;
     case 'manual':
       if (o.proxy.server) {
         return o.proxy.bypass
@@ -105,6 +121,7 @@ function resolveA2Proxy(
 export function buildA2Config(o: RecorderOptions, browsersPath: string): A2Config {
   return {
     startUrl: o.startUrl,
+    noProxyServer: o.proxy.mode === 'direct' ? true : undefined,
     proxy: resolveA2Proxy(o),
     viewport: o.viewport,
     extraHeaders: o.extraHeaders,
@@ -127,6 +144,7 @@ export class PlaywrightRecorderRunner implements RecorderRunner {
   private recordingTimer: NodeJS.Timeout | null = null;
   private killTimer: NodeJS.Timeout | null = null;
   private markedRecording = false;
+  private stopRequested = false;
 
   get running(): boolean {
     return this.child !== null;
@@ -166,6 +184,7 @@ export class PlaywrightRecorderRunner implements RecorderRunner {
 
     this.stderrBuf = '';
     this.markedRecording = false;
+    this.stopRequested = false;
     this.currentOutputPath = options.outputPath;
 
     const browsersPath = getBrowsersPath();
@@ -225,7 +244,10 @@ export class PlaywrightRecorderRunner implements RecorderRunner {
   }
 
   private async handleExit(code: number | null): Promise<void> {
-    if (code === 0) {
+    // Un arrêt demandé via stop() tue le child par signal (exit code null) :
+    // ce n'est pas une erreur. Le fichier --output est écrit en continu par
+    // codegen (flush ~250 ms) et survit au SIGTERM — on le lit dans les deux cas.
+    if (code === 0 || this.stopRequested) {
       let codePreview: string | undefined;
       if (this.currentOutputPath) {
         try {
@@ -266,6 +288,7 @@ export class PlaywrightRecorderRunner implements RecorderRunner {
     const child = this.child;
     if (!child) return;
 
+    this.stopRequested = true;
     child.kill('SIGTERM');
 
     this.killTimer = setTimeout(() => {
