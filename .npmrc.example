@@ -1,0 +1,25 @@
+# .npmrc.example — gabarit pour environnement Nexus (registre interne).
+# Copier ce fichier en .npmrc et renseigner les valeurs réelles.
+# NE JAMAIS commiter le .npmrc réel (il contient des credentials) — il est
+# ignoré via .gitignore.
+
+# Registre npm interne (Nexus). Remplacer par l'URL de votre instance.
+# registry=https://nexus.corp.example/repository/npm-group/
+
+# Authentification (token Nexus) — ne pas commiter.
+# //nexus.corp.example/repository/npm-group/:_authToken=${NPM_TOKEN}
+
+# Certificat CA d'entreprise (si TLS interne).
+# cafile=/chemin/vers/corp-ca.pem
+
+# Proxy HTTP/HTTPS si requis par le réseau interne.
+# proxy=http://proxy.corp.example:8080
+# https-proxy=http://proxy.corp.example:8080
+
+# Miroir des binaires Electron (utilisé au build uniquement).
+# Peut aussi être défini via la variable d'env ELECTRON_MIRROR.
+# electron_mirror=https://nexus.corp.example/repository/electron/
+
+# Miroir des browsers Playwright (utilisé au build uniquement).
+# Peut aussi être défini via la variable d'env PLAYWRIGHT_DOWNLOAD_HOST.
+# À poser dans l'environnement du build : PLAYWRIGHT_DOWNLOAD_HOST=...
