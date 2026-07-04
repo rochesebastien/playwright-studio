@@ -200,7 +200,10 @@ export class PlaywrightRecorderRunner implements RecorderRunner {
     this.stderrBuf = '';
     this.markedRecording = false;
     this.stopRequested = false;
-    this.currentOutputPath = options.outputPath;
+    // A2 (page.pause) n'écrit AUCUN fichier (pas d'API publique, DECISIONS.md Q3) :
+    // ne pas annoncer d'outputPath qui n'existera jamais.
+    this.currentOutputPath =
+      options.engine === 'api' ? undefined : options.outputPath;
 
     const browsersPath = getBrowsersPath();
     const env = buildChildEnv(browsersPath);

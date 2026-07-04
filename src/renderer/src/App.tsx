@@ -209,7 +209,7 @@ function Studio({ api }: { api: Api }) {
         </p>
       </header>
 
-      <StatusBanner status={status} fallbackOutputPath={fullOutputPath} />
+      <StatusBanner status={status} engine={engine} fallbackOutputPath={fullOutputPath} />
 
       <fieldset className="form" disabled={busy}>
         <legend className="sr-only">Configuration de l'enregistrement</legend>

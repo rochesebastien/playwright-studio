@@ -50,8 +50,8 @@ playwright-studio/
 ├── scripts/
 │   └── prepare-browsers.mjs    # télécharge Chromium 1194 dans resources/ms-playwright
 ├── tests/                      # vitest (unitaires + smoke)
-├── docs/                       # ARCHITECTURE.md, DECISIONS.md, BUILD.md
-├── .github/workflows/          # CI : lint+tests (linux) + build portable (windows)
+├── docs/                       # ARCHITECTURE.md, DECISIONS.md, BUILD.md, VALIDATION-WINDOWS.md
+├── .github/workflows/          # CI : typecheck+tests (linux) + build portable (windows)
 ├── electron.vite.config.ts
 ├── electron-builder.yml
 ├── .npmrc.example              # gabarit Nexus (registre interne)

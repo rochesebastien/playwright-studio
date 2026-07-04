@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import type { RecorderStatus } from '../../../shared/types';
+import type { RecorderEngine, RecorderStatus } from '../../../shared/types';
 
 interface StatusBannerProps {
   status: RecorderStatus;
+  /** Moteur du run : en 'api' (A2) aucun fichier n'est écrit, le message diffère. */
+  engine: RecorderEngine;
   /** Chemin de sortie composé par le formulaire, utilisé si le statut n'en fournit pas. */
   fallbackOutputPath: string;
 }
@@ -15,9 +17,10 @@ const STATE_LABEL: Record<RecorderStatus['state'], string> = {
   error: 'Erreur',
 };
 
-export default function StatusBanner({ status, fallbackOutputPath }: StatusBannerProps) {
+export default function StatusBanner({ status, engine, fallbackOutputPath }: StatusBannerProps) {
   const [copied, setCopied] = useState(false);
-  const outputPath = status.outputPath || fallbackOutputPath;
+  const isApiEngine = engine === 'api';
+  const outputPath = isApiEngine ? undefined : status.outputPath || fallbackOutputPath;
 
   const copyCode = async () => {
     if (!status.codePreview) return;
@@ -40,6 +43,13 @@ export default function StatusBanner({ status, fallbackOutputPath }: StatusBanne
       {status.state === 'stopped' && outputPath ? (
         <p className="status-detail">
           Code écrit dans <code className="path">{outputPath}</code>
+        </p>
+      ) : null}
+
+      {status.state === 'stopped' && isApiEngine ? (
+        <p className="status-detail">
+          Moteur API (page.pause) : aucun fichier n'est écrit — récupérez le code
+          via le bouton « Copy » de l'inspecteur Playwright avant de le fermer.
         </p>
       ) : null}
 
