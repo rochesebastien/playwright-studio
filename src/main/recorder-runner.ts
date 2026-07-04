@@ -5,7 +5,12 @@ import type {
   RecorderStatus,
   StartResult,
 } from '../shared/types';
-import { getPlaywrightCliPath, getA2RunnerPath, getBrowsersPath } from './paths';
+import {
+  getPlaywrightCliPath,
+  getPlaywrightModulePath,
+  getA2RunnerPath,
+  getBrowsersPath,
+} from './paths';
 
 /** Taille max du buffer circulaire stderr. */
 const STDERR_MAX = 2000;
@@ -94,6 +99,11 @@ interface A2Config {
   viewport?: { width: number; height: number };
   extraHeaders?: Record<string, string>;
   browsersPath: string;
+  /**
+   * Racine du module playwright à require() par le script — indispensable en
+   * packagé où a2-runner.cjs (dans resources/) ne voit pas app.asar.unpacked.
+   */
+  playwrightModulePath?: string;
 }
 
 /** Résout la config proxy des options en config Playwright (ou undefined). */
@@ -118,7 +128,11 @@ function resolveA2Proxy(
   }
 }
 
-export function buildA2Config(o: RecorderOptions, browsersPath: string): A2Config {
+export function buildA2Config(
+  o: RecorderOptions,
+  browsersPath: string,
+  playwrightModulePath?: string,
+): A2Config {
   return {
     startUrl: o.startUrl,
     noProxyServer: o.proxy.mode === 'direct' ? true : undefined,
@@ -126,6 +140,7 @@ export function buildA2Config(o: RecorderOptions, browsersPath: string): A2Confi
     viewport: o.viewport,
     extraHeaders: o.extraHeaders,
     browsersPath,
+    playwrightModulePath,
   };
 }
 
@@ -194,7 +209,7 @@ export class PlaywrightRecorderRunner implements RecorderRunner {
     try {
       if (options.engine === 'api') {
         const a2Path = getA2RunnerPath();
-        const config = buildA2Config(options, browsersPath);
+        const config = buildA2Config(options, browsersPath, getPlaywrightModulePath());
         cmdArgs = [a2Path, JSON.stringify(config)];
       } else {
         const cliPath = getPlaywrightCliPath();

@@ -48,6 +48,22 @@ export function getPlaywrightCliPath(): string {
 }
 
 /**
+ * Racine du module playwright (dossier contenant son package.json).
+ * Nécessaire au script A2 : spawné depuis <resources>/a2-runner.cjs en packagé,
+ * son require('playwright') ne peut PAS se résoudre par la hiérarchie
+ * node_modules (les modules sont dans app.asar.unpacked, pas sous resources/).
+ * On lui passe donc ce chemin explicitement via la config.
+ */
+export function getPlaywrightModulePath(): string {
+  const pkgJson = require.resolve('playwright/package.json');
+  const resolved = path.dirname(pkgJson);
+  if (app.isPackaged) {
+    return resolved.replace('app.asar', 'app.asar.unpacked');
+  }
+  return resolved;
+}
+
+/**
  * Chemin du script standalone A2 (spawné hors asar).
  * dev     : <repoRoot>/resources/a2-runner.cjs.
  * packagé : <resources>/a2-runner.cjs (extraResources).

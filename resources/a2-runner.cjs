@@ -12,7 +12,8 @@
  *   proxy?: { server: string, bypass?: string },  // undefined = héritage système
  *   viewport?: { width, height },
  *   extraHeaders?: Record<string,string>,
- *   browsersPath: string
+ *   browsersPath: string,
+ *   playwrightModulePath?: string  // racine du module playwright (requis en packagé)
  * }
  *
  * Isolation stricte : chromium.launch (contexte NON-persistant), JAMAIS
@@ -30,7 +31,10 @@ async function main() {
   /** @type {{ startUrl?: string, proxy?: { server: string, bypass?: string }, viewport?: { width: number, height: number }, extraHeaders?: Record<string,string>, browsersPath?: string }} */
   const config = JSON.parse(rawConfig);
 
-  const { chromium } = require('playwright');
+  // En packagé, ce script vit dans <resources>/ hors de toute hiérarchie
+  // node_modules : require('playwright') n'y est pas résoluble. Le main passe
+  // le chemin explicite du module (app.asar.unpacked/...).
+  const { chromium } = require(config.playwrightModulePath || 'playwright');
 
   const launchOptions = { headless: false };
   if (config.noProxyServer) {
