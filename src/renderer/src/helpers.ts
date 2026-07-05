@@ -5,6 +5,8 @@ import type {
   ProxyConfig,
   RecorderOptions,
   RecorderEngine,
+  RecorderBrowser,
+  StepsConfig,
 } from '../../shared/types';
 
 /** Type utilitaire : l'API preload, garantie non nulle une fois Electron détecté. */
@@ -16,6 +18,9 @@ export interface HeaderPair {
   value: string;
 }
 
+/** Gabarit de commentaire d'étape par défaut. */
+export const DEFAULT_STEP_PATTERN = 'STEP {n} : {label}';
+
 /** Options du select « Langage cible » (contrat §5 : TargetLang). */
 export const TARGET_OPTIONS: ReadonlyArray<{ value: TargetLang; label: string }> = [
   { value: 'playwright-test', label: 'Playwright Test (TypeScript)' },
@@ -24,6 +29,12 @@ export const TARGET_OPTIONS: ReadonlyArray<{ value: TargetLang; label: string }>
   { value: 'python-pytest', label: 'Pytest' },
   { value: 'java', label: 'Java' },
   { value: 'csharp', label: 'C#' },
+];
+
+/** Options du navigateur d'enregistrement (contrat §5 : RecorderBrowser). */
+export const BROWSER_OPTIONS: ReadonlyArray<{ value: RecorderBrowser; label: string }> = [
+  { value: 'chromium', label: 'Chrome (Chromium embarqué)' },
+  { value: 'msedge', label: 'Microsoft Edge (installé sur le poste)' },
 ];
 
 /** Nom de fichier de sortie par défaut, cohérent avec le langage cible. */
@@ -48,10 +59,12 @@ export function defaultFilenameFor(target: TargetLang): string {
 /** Settings de repli avant le premier chargement / si getSettings échoue. */
 export const FALLBACK_SETTINGS: Settings = {
   engine: 'codegen',
+  browser: 'chromium',
   startUrl: '',
   target: 'playwright-test',
   outputDir: '',
   proxy: { mode: 'direct' },
+  steps: { enabled: false, pattern: DEFAULT_STEP_PATTERN, labels: [] },
 };
 
 /**
@@ -115,9 +128,23 @@ export function parseViewport(
   return undefined;
 }
 
+/** Compose la config d'étapes à partir des champs du formulaire. */
+export function buildSteps(
+  enabled: boolean,
+  pattern: string,
+  labels: ReadonlyArray<string>,
+): StepsConfig {
+  return {
+    enabled,
+    pattern: pattern.trim() ? pattern : DEFAULT_STEP_PATTERN,
+    labels: [...labels],
+  };
+}
+
 /** État complet du formulaire, source unique pour composer Settings / RecorderOptions. */
 export interface FormState {
   engine: RecorderEngine;
+  browser: RecorderBrowser;
   startUrl: string;
   target: TargetLang;
   outputDir: string;
@@ -129,6 +156,9 @@ export interface FormState {
   viewportHeight: string;
   device: string;
   headers: HeaderPair[];
+  stepsEnabled: boolean;
+  stepsPattern: string;
+  stepsLabels: string[];
 }
 
 export function toSettings(f: FormState): Settings {
@@ -138,10 +168,12 @@ export function toSettings(f: FormState): Settings {
 
   const settings: Settings = {
     engine: f.engine,
+    browser: f.browser,
     startUrl: f.startUrl,
     target: f.target,
     outputDir: f.outputDir,
     proxy: buildProxy(f.proxyMode, f.proxyServer, f.proxyBypass),
+    steps: buildSteps(f.stepsEnabled, f.stepsPattern, f.stepsLabels),
   };
   // viewport et device sont mutuellement exclusifs (viewport prioritaire).
   if (viewport) settings.viewport = viewport;
@@ -158,9 +190,11 @@ export function toRecorderOptions(f: FormState): RecorderOptions {
 
   const options: RecorderOptions = {
     engine: f.engine,
+    browser: f.browser,
     target: f.target,
     outputPath: joinPath(f.outputDir, f.fileName),
     proxy: buildProxy(f.proxyMode, f.proxyServer, f.proxyBypass),
+    steps: buildSteps(f.stepsEnabled, f.stepsPattern, f.stepsLabels),
   };
   if (startUrl) options.startUrl = startUrl;
   if (viewport) options.viewport = viewport;

@@ -1,5 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+// Police Bricolage Grotesque auto-hébergée (aucune ressource externe au runtime).
+import '@fontsource-variable/bricolage-grotesque';
 import App from './App';
 import './styles.css';
 
