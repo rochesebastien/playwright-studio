@@ -81,12 +81,13 @@
   z-index: 0;
 }
 
-/* Rayures diagonales « chantier » : alternance jaune / gris foncé, ~45°, bandes nettes. */
+/* Rayures diagonales « chantier » : alternance orange / gris foncé, ~45°, bandes
+   nettes. Orange (et non jaune) pour bien se distinguer du blob jaune de la page. */
 .stripes {
   background-image: repeating-linear-gradient(
     45deg,
-    var(--color-brand-yellow) 0,
-    var(--color-brand-yellow) 90px,
+    var(--color-brand-orange) 0,
+    var(--color-brand-orange) 90px,
     var(--color-stripe) 90px,
     var(--color-stripe) 180px
   );

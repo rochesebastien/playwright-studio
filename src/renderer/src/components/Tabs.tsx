@@ -46,7 +46,8 @@ export default function Tabs({
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
-              <Icon size={18} />
+              {/* Icône jaune sur fond bleu (convention des boutons bleus). */}
+              <Icon size={18} className={isActive ? 'text-brand-yellow' : undefined} />
               {label}
             </button>
           );

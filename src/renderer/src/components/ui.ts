@@ -14,6 +14,8 @@ export const btnVariant = {
   green: 'bg-brand-green text-white hover:brightness-110',
   red: 'bg-brand-red text-white hover:brightness-110',
   orange: 'bg-brand-orange text-white hover:brightness-110',
+  /** Jaune de marque, texte/icône noirs (ex. Checkpoint d'étapes). */
+  yellow: 'bg-brand-yellow text-black hover:brightness-105',
   blue: 'bg-brand text-white hover:brightness-125',
   ghost: 'bg-gray-200 text-gray-700 hover:bg-gray-300',
 } as const;

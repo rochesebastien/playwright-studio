@@ -104,7 +104,7 @@ export default function Header({
             ) : (
               <button
                 type="button"
-                className={`${btnBase} ${btnVariant.orange} shadow`}
+                className={`${btnBase} ${btnVariant.yellow} shadow`}
                 onClick={onCheckpoint}
               >
                 Checkpoint d'étapes
