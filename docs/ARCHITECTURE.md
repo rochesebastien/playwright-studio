@@ -155,7 +155,9 @@ export interface StartResult { ok: boolean; error?: string }
 | `settings:save`    | renderer → main   | `(s: Settings) => void` |
 | `recorder:start`   | renderer → main   | `(o: RecorderOptions) => StartResult` |
 | `recorder:stop`    | renderer → main   | `() => void` |
+| `recorder:checkpoint` | renderer → main | `() => CheckpointResult` (mode étapes) |
 | `recorder:status`  | main → renderer (send/on) | `(s: RecorderStatus)` |
+| `recorder:code`    | main → renderer (send/on) | `(content: string)` — code généré en direct |
 | `dialog:chooseOutput` | renderer → main | `(defaultName: string) => string \| null` |
 | `app:info`         | renderer → main   | `() => AppInfo` |
 
@@ -167,10 +169,14 @@ export interface RendererApi {
   saveSettings(s: Settings): Promise<void>;
   startRecording(o: RecorderOptions): Promise<StartResult>;
   stopRecording(): Promise<void>;
+  /** Mode étapes : clôture l'étape courante (snapshot du fichier généré). */
+  checkpoint(): Promise<CheckpointResult>;
   chooseOutputPath(defaultName: string): Promise<string | null>;
   getAppInfo(): Promise<AppInfo>;
   /** retourne une fonction de désabonnement */
   onStatus(cb: (s: RecorderStatus) => void): () => void;
+  /** Code généré en direct pendant l'enregistrement. Désabonnement retourné. */
+  onCode(cb: (content: string) => void): () => void;
 }
 ```
 
@@ -211,8 +217,11 @@ execFile(process.execPath, [playwrightCliPath, 'codegen', ...args], {
   - proxy `manual` → `--proxy-server=<server>` + si bypass `--proxy-bypass=<bypass>`
   - proxy `system` → rien
   - `--viewport-size=<w>,<h>` si viewport ; `--device=<device>` si device
+  - navigateur : `chromium` → rien (défaut) ; `msedge` → `--channel=msedge`
+    (utilise le Edge système Windows ; isolation identique — profil temporaire)
   - `startUrl` en dernier argument positionnel si non vide
-  - **Interdits** : `--user-data-dir`, `--save-storage`, `--load-storage`, `--browser` ≠ chromium
+  - **Interdits** : `--user-data-dir`, `--save-storage`, `--load-storage`,
+    `--browser` autre que chromium (firefox/webkit hors périmètre)
 - Nettoyage env enfant : retirer `NODE_OPTIONS`, `ELECTRON_ENABLE_LOGGING`.
   Ajouter `PLAYWRIGHT_DISABLE_FORCED_CHROMIUM_PROXIED_LOOPBACK=1` (requis pour que
   le mode direct couvre aussi le loopback, cf. §4 ; sans effet dans les autres modes
@@ -220,6 +229,35 @@ execFile(process.execPath, [playwrightCliPath, 'codegen', ...args], {
 - Fin de process : exit 0 → état `stopped` + lecture du fichier output pour `codePreview` ;
   exit ≠ 0 → état `error` avec stderr (dernières ~2000 chars).
 - `stop()` → SIGTERM (Windows : `child.kill()`), timeout 5 s puis kill forcé.
+
+### Code en direct & mode étapes (A1 uniquement)
+
+Constat validé (DECISIONS.md, bonus Q1) : codegen écrit le fichier `--output`
+**en continu** (flush ~250 ms) et **régénère tout le contenu à chaque action**
+(on ne peut donc pas insérer de texte dans le fichier pendant le run : il
+serait écrasé).
+
+- **Code en direct** : pendant le run, le main **polle le fichier output**
+  (~500 ms). À chaque changement, il émet `recorder:code` avec le contenu
+  courant — enrichi des commentaires d'étape déjà connus (voir ci-dessous),
+  pour que la vue live soit identique au fichier final.
+- **Mode étapes** (checkpoints) :
+  - `checkpoint()` lit le contenu courant du fichier et le stocke comme
+    **snapshot de fin d'étape n** ; `currentStep` passe à n+1.
+  - À l'arrêt (exit du child), post-traitement : fonction PURE
+    `injectStepComments(finalContent, snapshots, config, target): string` —
+    pour chaque snapshot, calcule le **plus long préfixe commun en lignes**
+    avec le contenu final et insère le commentaire d'étape n+1 à cette
+    frontière ; le commentaire d'étape 1 est inséré à la frontière du
+    **snapshot initial S0** (contenu du fichier à sa première apparition).
+    Le résultat est réécrit dans le fichier output.
+  - Préfixe de commentaire selon le langage cible : `//` (playwright-test,
+    javascript, java, csharp), `#` (python, python-pytest).
+  - Gabarit : `pattern` avec `{n}` et `{label}` (défaut `STEP {n} : {label}`) ;
+    libellés depuis `labels[]`, au-delà `Étape {n}`.
+  - Limitation assumée (documentée) : codegen peut réécrire la dernière action
+    (ex. consolidation d'un fill) — la frontière préfixe-commun place alors le
+    commentaire avant la dernière action stable. Acceptable v1.
 
 ### A2 (`engine: 'api'`) — fallback contexte avancé
 
@@ -277,6 +315,18 @@ export function getA2RunnerPath(): string
 - Lecture tolérante : fichier absent/corrompu → défauts + réécriture.
 - Validation à la main (pas de dépendance de schéma) : chaque champ inconnu ignoré,
   chaque champ manquant → défaut.
+- Défauts v2 : `browser: 'chromium'`, `steps: { enabled: false,
+  pattern: 'STEP {n} : {label}', labels: [] }`.
+
+## 14. UI (v2)
+
+- **Tailwind CSS v4** (`@tailwindcss/vite` dans la config renderer) + CSS custom
+  minimal ; **lucide-react** pour les icônes ; police **Bricolage Grotesque**
+  auto-hébergée via `@fontsource-variable/bricolage-grotesque` (aucune ressource
+  externe au runtime — CSP `default-src 'self'`).
+- Thème clair. Couleurs de marque : bleu `#0907F7`, jaune `#FFC000`.
+  Typo : Bricolage Grotesque Medium (500), letter-spacing −8 % (−0.08em).
+- Fenêtre principale : 1240×860 min 1080×720.
 
 ## 13. Sécurité fenêtre
 
