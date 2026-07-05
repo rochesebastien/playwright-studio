@@ -4,99 +4,103 @@
   <img src="./git_cover.png" alt="PlaywrightStudio" width="100%" />
 </p>
 
-Launcher desktop qui lance un Chromium Playwright **totalement isolé** pour enregistrer un scénario et en générer le code. L'application **contrôle l'environnement** (isolation, proxy, packaging, distribution) ; le moteur de capture et de génération des sélecteurs n'est **pas** réécrit — c'est Playwright (`codegen`) qui fait le recording.
+A desktop launcher that starts a **fully isolated** Playwright Chromium to record a scenario and generate its code. The app **controls the environment** (isolation, proxy, packaging, distribution); the capture engine and selector generation are **not** rewritten — Playwright (`codegen`) does the recording.
 
-## Pourquoi
+## Why
 
-Sur un poste d'entreprise, `playwright codegen` lancé « à la main » hérite du profil Chrome, des cookies, du SSO et du proxy système. Les scénarios enregistrés se retrouvent pollués par une session déjà authentifiée et un routage réseau non maîtrisé.
+Launched "by hand", `playwright codegen` inherits your Chrome profile, cookies, authenticated sessions and system proxy. Recorded scenarios end up polluted by an already-logged-in session and uncontrolled network routing.
 
-La réponse de Playwright Studio :
+Playwright Studio's answer:
 
-- **Chromium vierge à chaque lancement** : contexte **non-persistant**, profil temporaire jeté à la fermeture.
-- **Aucun état hérité** : jamais de `user-data-dir` fixe, de `storageState`, de `--save-storage` / `--load-storage` ni de `--incognito`.
-- **Proxy contrôlé** : mode `direct` par défaut (connexion réellement directe, y compris `localhost`), avec possibilité d'hériter du proxy système ou d'en configurer un manuellement — le choix est explicite.
+- **A clean Chromium on every launch**: a **non-persistent** context with a temporary profile that is discarded on close.
+- **No inherited state**: never a fixed `user-data-dir`, `storageState`, `--save-storage` / `--load-storage`, or `--incognito`.
+- **Controlled proxy**: `direct` mode by default (a genuinely direct connection, including `localhost`), with the option to inherit the system proxy or configure one manually — the choice is always explicit.
 
-## Utilisation
+## Usage
 
-Distribution : un **`.exe` portable Windows x64** (aucune installation, aucun Node/Playwright requis sur la machine).
+Distribution: a **portable Windows x64 `.exe`** (no installation, no Node/Playwright required on the machine).
 
-1. **Double-cliquer** sur l'exe portable. La fenêtre de configuration s'ouvre.
-2. Renseigner le formulaire :
-   - **URL de départ** (optionnel) : page sur laquelle démarrer l'enregistrement.
-   - **Langage cible** : `playwright-test`, `javascript`, `python`, `python-pytest`, `java` ou `csharp`.
-   - **Fichier de sortie** : nom + dossier (bouton « Parcourir… »). Le chemin retenu est affiché sous le champ.
-   - **Proxy** (3 modes, **`direct` par défaut**) :
-     - `direct` — aucun proxy, connexion directe (recommandé) ;
-     - `système` — héritage du proxy Windows (avertissement affiché : l'isolation réseau n'est alors plus garantie) ;
-     - `manuel` — serveur (`http://proxy:8080`) + liste de bypass optionnelle.
-   - **Avancé** (repliable) : viewport (largeur × hauteur) **ou** device Playwright (`iPhone 15`…, mutuellement exclusifs), moteur, et en-têtes HTTP (moteur API uniquement).
-3. Cliquer **« Démarrer l'enregistrement »**. Un **Chromium séparé** s'ouvre avec l'inspecteur/recorder Playwright.
-4. **Interagir** dans le navigateur : le code se génère au fil des actions.
-5. **Arrêter** (bouton « Arrêter » ou fermeture du navigateur) : l'app repasse en état « Terminé », le **code est écrit dans le fichier** de sortie et un **aperçu copiable** s'affiche (bouton « Copier »).
+1. **Double-click** the portable exe. The configuration window opens.
+2. Fill in the form:
+   - **Start URL** (optional): the page to begin recording on.
+   - **Target language**: `playwright-test`, `javascript`, `python`, `python-pytest`, `java` or `csharp`.
+   - **Output file**: name + folder ("Browse…" button). The chosen path is shown under the field.
+   - **Proxy** (3 modes, **`direct` by default**):
+     - `direct` — no proxy, direct connection (recommended);
+     - `system` — inherit the Windows proxy (a warning is shown: network isolation is no longer guaranteed);
+     - `manual` — server (`http://proxy:8080`) + optional bypass list.
+   - **Advanced** (collapsible): viewport (width × height) **or** a Playwright device (`iPhone 15`…, mutually exclusive), engine, and HTTP headers (API engine only).
+3. Click **"Start recording"**. A **separate Chromium** opens with the Playwright inspector/recorder.
+4. **Interact** in the browser: code is generated as you go.
+5. **Stop** ("Stop" button or by closing the browser): the app returns to the "Done" state, the **code is written to the output file**, and a **copyable preview** is shown ("Copy" button).
 
-### Les deux moteurs
+### The two engines
 
-| Moteur | Rôle | Sortie du code |
-|--------|------|----------------|
-| **`codegen`** (recommandé, défaut) | Enregistreur standard `playwright codegen` | **Fichier automatique** via `--output`, écrit à chaud pendant l'enregistrement |
-| **`api`** (`page.pause`) | Fallback pour un contexte avancé (en-têtes HTTP personnalisés) | **Pas de sortie fichier automatique** : le code se récupère via le **bouton « copy » de l'inspecteur** (limitation documentée — voir [DECISIONS.md](docs/DECISIONS.md) Q3) |
+| Engine | Role | Code output |
+|--------|------|-------------|
+| **`codegen`** (recommended, default) | Standard `playwright codegen` recorder | **Automatic file** via `--output`, written live during recording |
+| **`api`** (`page.pause`) | Fallback for advanced contexts (custom HTTP headers) | **No automatic file output**: retrieve the code via the inspector's **"copy" button** (documented limitation — see [DECISIONS.md](docs/DECISIONS.md) Q3) |
 
-## Garanties d'isolation
+## Isolation guarantees
 
-Faits vérifiables (voir [ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 et [VALIDATION-WINDOWS.md](docs/VALIDATION-WINDOWS.md) lots 1–3) :
+Verifiable facts (see [ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 and [VALIDATION-WINDOWS.md](docs/VALIDATION-WINDOWS.md) batches 1–3):
 
-- **Profil temporaire jeté** : Chromium tourne dans un `--user-data-dir` temporaire (`%TEMP%\playwright_chromiumdev_profile-XXXX`) créé au lancement et supprimé à la fermeture.
-- **Jamais** de `user-data-dir` fixe, de `storageState`, de `--save-storage` / `--load-storage` ni de `--incognito` (interdits absolus).
-- **Mode `direct` réellement direct**, y compris `localhost` : implémenté par `--proxy-server=direct:// --proxy-bypass=*` + env `PLAYWRIGHT_DISABLE_FORCED_CHROMIUM_PROXIED_LOOPBACK=1` (le `direct://` seul est réécrit et casse la navigation — voir [DECISIONS.md](docs/DECISIONS.md) Q1).
-- **Mode `système` = héritage explicite et assumé** : aucun flag proxy n'est émis, Chromium reprend le proxy Windows. L'UI l'indique par un avertissement.
-- **Aucune session partagée** entre deux enregistrements successifs.
+- **Temporary profile discarded**: Chromium runs in a temporary `--user-data-dir` (`%TEMP%\playwright_chromiumdev_profile-XXXX`) created at launch and deleted on close.
+- **Never** a fixed `user-data-dir`, `storageState`, `--save-storage` / `--load-storage`, or `--incognito` (hard bans).
+- **`direct` mode is genuinely direct**, including `localhost`: implemented via `--proxy-server=direct:// --proxy-bypass=*` + env `PLAYWRIGHT_DISABLE_FORCED_CHROMIUM_PROXIED_LOOPBACK=1` (`direct://` alone gets rewritten and breaks navigation — see [DECISIONS.md](docs/DECISIONS.md) Q1).
+- **`system` mode = explicit, assumed inheritance**: no proxy flag is emitted, Chromium picks up the Windows proxy. The UI flags this with a warning.
+- **No shared session** between two successive recordings.
 
-## Développement
+## Development
 
-Prérequis : **Node 22.x** (aligné sur le Node embarqué d'Electron 38).
+Requirements: **Node 22.x** (aligned with the Node bundled in Electron 38).
 
 ```bash
-# Installation des dépendances.
-# En egress contraint (CDN Electron / browsers Playwright bloqués), désactiver
-# les téléchargements au moment de l'install :
-#   ELECTRON_SKIP_BINARY_DOWNLOAD=1  → pas de binaire Electron (dev sans packaging)
-#   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 → pas de browsers à l'install
+# Install dependencies.
+# Under restricted egress (Electron CDN / Playwright browsers blocked), disable
+# downloads at install time:
+#   ELECTRON_SKIP_BINARY_DOWNLOAD=1   → no Electron binary (dev without packaging)
+#   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 → no browsers at install
 npm install
 
-# Lancer l'app en mode développement (electron-vite).
+# Run the app in development mode (electron-vite).
 npm run dev
 
-# Tests unitaires + smoke (vitest).
-# Le smoke lance un vrai Chromium headed → sous Linux, encapsuler dans xvfb :
+# Unit + smoke tests (vitest).
+# The smoke test launches a real headed Chromium → on Linux, wrap it in xvfb:
 xvfb-run -a npm test        # Linux
 npm test                    # Windows / macOS
 
-# Vérification de types (main).
+# Type checking (main).
 npm run typecheck
 ```
 
-Scripts npm réels : `dev`, `build`, `typecheck`, `test`, `prepare-browsers`, `dist:win`.
+Actual npm scripts: `dev`, `build`, `typecheck`, `test`, `prepare-browsers`, `dist:win`.
 
-Le build de l'`.exe` portable est décrit dans [docs/BUILD.md](docs/BUILD.md).
+Building the portable `.exe` is described in [docs/BUILD.md](docs/BUILD.md).
 
-## Versions figées
+## Pinned versions
 
-Ne pas suivre `latest`. La stack est figée et testée telle quelle.
+Do not track `latest`. The stack is pinned and tested exactly as-is.
 
-| Composant | Version figée | Détail |
-|-----------|---------------|--------|
-| Playwright | **1.56.1** | Pilote le recording et le codegen |
-| Chromium (enregistré) | révision **1194** = **141.0.7390.37** | Navigateur piloté par Playwright, embarqué via `resources/ms-playwright` |
-| Electron | **38.8.6** | Embarque **Node 22.x** ; sert aussi de runtime Node pour spawner le CLI (`ELECTRON_RUN_AS_NODE`) |
-| Node (build) | **22.x** | Aligné sur Electron 38 |
+| Component | Pinned version | Detail |
+|-----------|----------------|--------|
+| Playwright | **1.56.1** | Drives recording and codegen |
+| Chromium (recorded) | revision **1194** = **141.0.7390.37** | Browser driven by Playwright, bundled via `resources/ms-playwright` |
+| Electron | **38.8.6** | Bundles **Node 22.x**; also serves as the Node runtime to spawn the CLI (`ELECTRON_RUN_AS_NODE`) |
+| Node (build) | **22.x** | Aligned with Electron 38 |
 
-> Le Chromium **d'Electron** (UI de l'app, 140.x) et le Chromium **de Playwright** (rev 1194, 141.x, enregistré) sont deux processus distincts, sans interaction.
+> Electron's Chromium (the app UI, 140.x) and Playwright's Chromium (rev 1194, 141.x, recorded) are two distinct processes with no interaction.
 
-**Règle** : toute montée de version = **re-test complet du lot 0** (packaging, inspecteur hors asar, proxy, isolation). Justification dans [DECISIONS.md](docs/DECISIONS.md) Q5.
+**Rule**: any version bump = **full re-test of batch 0** (packaging, out-of-asar inspector, proxy, isolation). Rationale in [DECISIONS.md](docs/DECISIONS.md) Q5.
 
 ## Documentation
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — contrat de référence, stack, IPC, isolation, packaging.
-- [docs/DECISIONS.md](docs/DECISIONS.md) — les arbitrages techniques avec preuves (Q1 proxy direct, Q2 asar/inspecteur, Q3 sortie A2, Q4 `@playwright/cli`, Q5 matrice de versions).
-- [docs/BUILD.md](docs/BUILD.md) — build reproductible (Nexus, CI GitHub Actions, signature, dépannage).
-- [docs/VALIDATION-WINDOWS.md](docs/VALIDATION-WINDOWS.md) — checklist de validation sur machine Windows vierge.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — reference contract, stack, IPC, isolation, packaging.
+- [docs/DECISIONS.md](docs/DECISIONS.md) — technical trade-offs with evidence (Q1 direct proxy, Q2 asar/inspector, Q3 A2 output, Q4 `@playwright/cli`, Q5 version matrix).
+- [docs/BUILD.md](docs/BUILD.md) — reproducible build (Nexus, GitHub Actions CI, signing, troubleshooting).
+- [docs/VALIDATION-WINDOWS.md](docs/VALIDATION-WINDOWS.md) — validation checklist on a clean Windows machine.
+
+## License
+
+[MIT](LICENSE)
