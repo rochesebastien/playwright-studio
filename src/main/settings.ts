@@ -6,10 +6,14 @@ import type {
   ProxyConfig,
   ProxyMode,
   RecorderEngine,
+  RecorderBrowser,
+  StepsConfig,
   TargetLang,
 } from '../shared/types';
 
 const ENGINES: RecorderEngine[] = ['codegen', 'api'];
+const BROWSERS: RecorderBrowser[] = ['chromium', 'msedge'];
+const DEFAULT_STEP_PATTERN = 'STEP {n} : {label}';
 const TARGETS: TargetLang[] = [
   'playwright-test',
   'javascript',
@@ -27,10 +31,12 @@ function settingsFilePath(): string {
 export function defaultSettings(): Settings {
   return {
     engine: 'codegen',
+    browser: 'chromium',
     startUrl: '',
     target: 'playwright-test',
     outputDir: app.getPath('documents'),
     proxy: { mode: 'direct' },
+    steps: { enabled: false, pattern: DEFAULT_STEP_PATTERN, labels: [] },
   };
 }
 
@@ -80,6 +86,31 @@ function validateExtraHeaders(
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+/**
+ * Valide la config du mode étapes champ par champ.
+ * enabled non booléen → false ; pattern non-string ou vide → défaut ;
+ * labels non-array ou éléments non-string → filtrés.
+ */
+function validateSteps(raw: unknown): StepsConfig {
+  const fallback: StepsConfig = {
+    enabled: false,
+    pattern: DEFAULT_STEP_PATTERN,
+    labels: [],
+  };
+  if (!isObject(raw)) return fallback;
+
+  const enabled = typeof raw.enabled === 'boolean' ? raw.enabled : fallback.enabled;
+  const pattern =
+    typeof raw.pattern === 'string' && raw.pattern.trim() !== ''
+      ? raw.pattern
+      : fallback.pattern;
+  const labels = Array.isArray(raw.labels)
+    ? raw.labels.filter((x): x is string => typeof x === 'string')
+    : fallback.labels;
+
+  return { enabled, pattern, labels };
+}
+
 /** Validation champ par champ : champ manquant/invalide → défaut, champ inconnu ignoré. */
 export function validateSettings(raw: unknown): Settings {
   const d = defaultSettings();
@@ -89,6 +120,11 @@ export function validateSettings(raw: unknown): Settings {
     typeof raw.engine === 'string' && ENGINES.includes(raw.engine as RecorderEngine)
       ? (raw.engine as RecorderEngine)
       : d.engine;
+
+  const browser =
+    typeof raw.browser === 'string' && BROWSERS.includes(raw.browser as RecorderBrowser)
+      ? (raw.browser as RecorderBrowser)
+      : d.browser;
 
   const startUrl = typeof raw.startUrl === 'string' ? raw.startUrl : d.startUrl;
 
@@ -104,10 +140,12 @@ export function validateSettings(raw: unknown): Settings {
 
   const settings: Settings = {
     engine,
+    browser,
     startUrl,
     target,
     outputDir,
     proxy: validateProxy(raw.proxy),
+    steps: validateSteps(raw.steps),
   };
 
   const viewport = validateViewport(raw.viewport);

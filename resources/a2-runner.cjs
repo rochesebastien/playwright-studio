@@ -10,6 +10,7 @@
  *   startUrl?: string,
  *   noProxyServer?: boolean,  // mode direct : arg Chromium brut --no-proxy-server
  *   proxy?: { server: string, bypass?: string },  // undefined = héritage système
+ *   channel?: string,        // ex. 'msedge' = Edge système ; absent = Chromium embarqué
  *   viewport?: { width, height },
  *   extraHeaders?: Record<string,string>,
  *   browsersPath: string,
@@ -37,6 +38,11 @@ async function main() {
   const { chromium } = require(config.playwrightModulePath || 'playwright');
 
   const launchOptions = { headless: false };
+  // Navigateur : channel 'msedge' = Edge système (isolation identique, profil
+  // temporaire jeté). Absent → Chromium Playwright embarqué.
+  if (config.channel) {
+    launchOptions.channel = config.channel;
+  }
   if (config.noProxyServer) {
     // Mode direct : arg Chromium brut. L'option proxy { server: 'direct://' }
     // serait réécrite en http://direct par Playwright et casserait la navigation.
