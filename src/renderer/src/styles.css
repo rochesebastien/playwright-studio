@@ -67,16 +67,17 @@
  * Primitives décoratives (custom, hors utilitaires Tailwind)
  * ------------------------------------------------------------------ */
 
-/* Blob jaune organique : coin supérieur gauche de la page, déborde en haut/gauche,
-   grand arrondi en bas-droite (type super-ellipse). */
+/* Blob jaune : quart d'ellipse ancré au coin supérieur gauche. La frontière est
+   une seule courbe continue, du haut (~70 % de la largeur) jusqu'au bord gauche
+   (~2/3 de la hauteur) — border-radius 100 % sur le seul coin bas-droit. */
 .blob {
   position: fixed;
-  top: -300px;
-  left: -280px;
-  width: 1120px;
-  height: 850px;
+  top: 0;
+  left: 0;
+  width: 70vw;
+  height: 84vh;
   background: var(--color-brand-yellow);
-  border-radius: 0 0 480px 120px;
+  border-radius: 0 0 100% 0;
   pointer-events: none;
   z-index: 0;
 }
