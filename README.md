@@ -1,5 +1,9 @@
 # Playwright Studio
 
+<p align="center">
+  <img src="./git_cover.png" alt="PlaywrightStudio" width="100%" />
+</p>
+
 Launcher desktop qui lance un Chromium Playwright **totalement isolé** pour enregistrer un scénario et en générer le code. L'application **contrôle l'environnement** (isolation, proxy, packaging, distribution) ; le moteur de capture et de génération des sélecteurs n'est **pas** réécrit — c'est Playwright (`codegen`) qui fait le recording.
 
 ## Pourquoi
