@@ -25,6 +25,7 @@ import type { RecorderOptions } from '../../src/shared/types';
 function baseOptions(over: Partial<RecorderOptions> = {}): RecorderOptions {
   return {
     engine: 'codegen',
+    browser: 'chromium',
     target: 'playwright-test',
     outputPath: '/out/spec.ts',
     proxy: { mode: 'direct' },
@@ -174,6 +175,44 @@ describe('buildCodegenArgs — viewport, device, startUrl', () => {
       }),
     );
     assertNoForbidden(args);
+  });
+});
+
+describe('buildCodegenArgs — navigateur (channel)', () => {
+  it('msedge → ajoute --channel=msedge', () => {
+    const args = buildCodegenArgs(baseOptions({ browser: 'msedge' }));
+    expect(args).toContain('--channel=msedge');
+  });
+
+  it('chromium → aucun --channel (défaut)', () => {
+    const args = buildCodegenArgs(baseOptions({ browser: 'chromium' }));
+    expect(args.join(' ')).not.toContain('--channel');
+  });
+
+  it('msedge n’introduit aucun flag interdit et garde startUrl en dernier', () => {
+    const args = buildCodegenArgs(
+      baseOptions({ browser: 'msedge', startUrl: 'https://example.com' }),
+    );
+    assertNoForbidden(args);
+    expect(args[args.length - 1]).toBe('https://example.com');
+  });
+});
+
+describe('buildA2Config — navigateur (channel)', () => {
+  it('msedge → channel: "msedge"', () => {
+    const cfg = buildA2Config(
+      baseOptions({ engine: 'api', browser: 'msedge' }),
+      '/opt/pw-browsers',
+    );
+    expect(cfg.channel).toBe('msedge');
+  });
+
+  it('chromium → channel undefined', () => {
+    const cfg = buildA2Config(
+      baseOptions({ engine: 'api', browser: 'chromium' }),
+      '/opt/pw-browsers',
+    );
+    expect(cfg.channel).toBeUndefined();
   });
 });
 

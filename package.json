@@ -18,6 +18,8 @@
     "playwright": "1.56.1"
   },
   "devDependencies": {
+    "@fontsource-variable/bricolage-grotesque": "^5.2.10",
+    "@tailwindcss/vite": "^4.3.2",
     "@types/node": "^22",
     "@types/react": "^18",
     "@types/react-dom": "^18",
@@ -25,8 +27,10 @@
     "electron": "38.8.6",
     "electron-builder": "^26",
     "electron-vite": "^4",
+    "lucide-react": "^1.23.0",
     "react": "^18",
     "react-dom": "^18",
+    "tailwindcss": "^4.3.2",
     "typescript": "^5",
     "vite": "^7",
     "vitest": "^3"

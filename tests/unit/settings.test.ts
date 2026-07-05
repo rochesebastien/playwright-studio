@@ -46,10 +46,16 @@ describe('defaultSettings', () => {
   it('correspond au contrat (§5/§12)', () => {
     const d = defaultSettings();
     expect(d.engine).toBe('codegen');
+    expect(d.browser).toBe('chromium');
     expect(d.startUrl).toBe('');
     expect(d.target).toBe('playwright-test');
     expect(d.outputDir).toBe(state.documents);
     expect(d.proxy).toEqual({ mode: 'direct' });
+    expect(d.steps).toEqual({
+      enabled: false,
+      pattern: 'STEP {n} : {label}',
+      labels: [],
+    });
   });
 });
 
@@ -80,6 +86,7 @@ describe('round-trip save/load', () => {
   it('relit exactement ce qui a été écrit', () => {
     const custom: Settings = {
       engine: 'api',
+      browser: 'msedge',
       startUrl: 'https://corp.local',
       target: 'python',
       outputDir: path.join(tmp, 'out'),
@@ -87,6 +94,7 @@ describe('round-trip save/load', () => {
       viewport: { width: 1440, height: 900 },
       device: 'iPhone 15',
       extraHeaders: { 'X-Test': '1' },
+      steps: { enabled: true, pattern: 'Étape {n}: {label}', labels: ['Login'] },
     };
     saveSettings(custom);
     const loaded = getSettings();
@@ -141,6 +149,96 @@ describe('validateSettings — champs inconnus / manquants', () => {
     expect(validateSettings(null)).toEqual(defaultSettings());
     expect(validateSettings('str')).toEqual(defaultSettings());
     expect(validateSettings([1, 2, 3])).toEqual(defaultSettings());
+  });
+});
+
+describe('validateSettings — champs v2 (browser, steps)', () => {
+  it('browser valide conservé, invalide → défaut chromium', () => {
+    expect(validateSettings({ browser: 'msedge' }).browser).toBe('msedge');
+    expect(validateSettings({ browser: 'chromium' }).browser).toBe('chromium');
+    expect(validateSettings({ browser: 'firefox' }).browser).toBe('chromium');
+    expect(validateSettings({ browser: 42 }).browser).toBe('chromium');
+    expect(validateSettings({}).browser).toBe('chromium');
+  });
+
+  it('steps valide (enabled/pattern/labels) conservé', () => {
+    const s = validateSettings({
+      steps: { enabled: true, pattern: 'S{n} {label}', labels: ['a', 'b'] },
+    });
+    expect(s.steps).toEqual({
+      enabled: true,
+      pattern: 'S{n} {label}',
+      labels: ['a', 'b'],
+    });
+  });
+
+  it('steps absent → défaut', () => {
+    expect(validateSettings({}).steps).toEqual({
+      enabled: false,
+      pattern: 'STEP {n} : {label}',
+      labels: [],
+    });
+  });
+
+  it('steps.enabled non booléen → false', () => {
+    expect(validateSettings({ steps: { enabled: 'yes' } }).steps.enabled).toBe(false);
+  });
+
+  it('steps.pattern non-string ou vide → défaut', () => {
+    expect(validateSettings({ steps: { pattern: '' } }).steps.pattern).toBe(
+      'STEP {n} : {label}',
+    );
+    expect(validateSettings({ steps: { pattern: '   ' } }).steps.pattern).toBe(
+      'STEP {n} : {label}',
+    );
+    expect(validateSettings({ steps: { pattern: 123 } }).steps.pattern).toBe(
+      'STEP {n} : {label}',
+    );
+  });
+
+  it('steps.labels : array filtré aux strings ; non-array → []', () => {
+    expect(
+      validateSettings({ steps: { labels: ['ok', 5, null, 'bis'] } }).steps.labels,
+    ).toEqual(['ok', 'bis']);
+    expect(validateSettings({ steps: { labels: 'nope' } }).steps.labels).toEqual([]);
+  });
+
+  it('steps non-objet → défaut complet', () => {
+    expect(validateSettings({ steps: 'garbage' }).steps).toEqual({
+      enabled: false,
+      pattern: 'STEP {n} : {label}',
+      labels: [],
+    });
+  });
+});
+
+describe('compat ascendante — settings.json v1', () => {
+  it('un settings v1 (sans browser ni steps) charge avec les défauts v2', () => {
+    // Fichier v1 tel qu'écrit par la v1 (aucun champ browser/steps).
+    const v1 = {
+      engine: 'codegen',
+      startUrl: 'https://legacy.local',
+      target: 'javascript',
+      outputDir: path.join(tmp, 'out'),
+      proxy: { mode: 'system' },
+    };
+    saveSettings(defaultSettings()); // crée le dossier userData
+    writeFileSync(settingsFile(), JSON.stringify(v1), 'utf8');
+
+    let s: Settings | undefined;
+    expect(() => {
+      s = getSettings();
+    }).not.toThrow();
+    expect(s?.startUrl).toBe('https://legacy.local');
+    expect(s?.target).toBe('javascript');
+    expect(s?.proxy).toEqual({ mode: 'system' });
+    // Champs v2 injectés par défaut.
+    expect(s?.browser).toBe('chromium');
+    expect(s?.steps).toEqual({
+      enabled: false,
+      pattern: 'STEP {n} : {label}',
+      labels: [],
+    });
   });
 });
 

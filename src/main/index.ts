@@ -8,8 +8,10 @@ const runner = new PlaywrightRecorderRunner();
 
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: 900,
-    height: 700,
+    width: 1240,
+    height: 860,
+    minWidth: 1080,
+    minHeight: 720,
     show: false,
     autoHideMenuBar: true,
     webPreferences: {

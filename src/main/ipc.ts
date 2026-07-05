@@ -5,6 +5,7 @@ import type {
   RecorderOptions,
   RecorderStatus,
   StartResult,
+  CheckpointResult,
   AppInfo,
 } from '../shared/types';
 import { getSettings, saveSettings } from './settings';
@@ -46,6 +47,13 @@ export function registerIpc(win: BrowserWindow, runner: RecorderRunner): void {
     }
   });
 
+  // Relais du code généré en direct → renderer.
+  runner.onCode((content: string) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send('recorder:code', content);
+    }
+  });
+
   ipcMain.handle('settings:get', (): Settings => {
     return getSettings();
   });
@@ -63,6 +71,10 @@ export function registerIpc(win: BrowserWindow, runner: RecorderRunner): void {
 
   ipcMain.handle('recorder:stop', (): Promise<void> => {
     return runner.stop();
+  });
+
+  ipcMain.handle('recorder:checkpoint', (): Promise<CheckpointResult> => {
+    return runner.checkpoint();
   });
 
   ipcMain.handle(
