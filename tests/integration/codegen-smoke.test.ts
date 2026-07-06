@@ -56,6 +56,23 @@ function waitExit(
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Attend que le fichier --output existe ET soit non vide, ou timeout.
+ * codegen écrit le fichier dès que Chromium est prêt (validé par steps-smoke) :
+ * on poll donc au lieu d'un délai fixe, robuste face à un runner CI lent.
+ */
+async function waitForFile(p: string, ms: number): Promise<string | null> {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (existsSync(p)) {
+      const c = readFileSync(p, 'utf8');
+      if (c.trim() !== '') return c;
+    }
+    await delay(300);
+  }
+  return null;
+}
+
 describe.skipIf(SKIP)('codegen smoke (real Playwright 1.56.1)', () => {
   it(
     'lance codegen sous xvfb, écrit --output, se ferme proprement au SIGTERM',
@@ -105,8 +122,14 @@ describe.skipIf(SKIP)('codegen smoke (real Playwright 1.56.1)', () => {
       });
 
       try {
-        // Laisse le temps au navigateur de démarrer et à codegen d'écrire le fichier.
-        await delay(9000);
+        // Attend que codegen démarre Chromium et écrive le fichier --output.
+        // Poll (jusqu'à 30s) au lieu d'un délai fixe : un runner CI lent peut
+        // mettre plus de 9s à booter Chromium sous xvfb.
+        const produced = await waitForFile(outPath, 30000);
+        expect(
+          produced,
+          `codegen n'a pas produit de fichier --output (code=${earlyExit?.code}, signal=${earlyExit?.signal}). stderr:\n${stderr.slice(-2000)}`,
+        ).not.toBeNull();
 
         // Le process ne doit PAS avoir crashé pendant la phase de démarrage.
         expect(
