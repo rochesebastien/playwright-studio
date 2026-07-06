@@ -1,0 +1,140 @@
+name: Release
+
+# Publication d'une release — déclenchement MANUEL uniquement (onglet Actions →
+# "Release" → "Run workflow"). Construit le portable Windows x64 (Chromium
+# Playwright embarqué) et publie une GitHub Release avec le .exe attaché.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version à publier (ex: 0.2.0). Vide = version du package.json.'
+        required: false
+        default: ''
+
+# Nécessaire pour créer le tag et la release.
+permissions:
+  contents: write
+
+# Une seule release à la fois.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          # Le binaire Electron n'est pas nécessaire pour les tests (les modules
+          # main sont testés en isolant/mockant 'electron').
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          # Les browsers Playwright sont installés séparément (étape cache ci-dessous).
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Chemin unique des browsers, partagé par le cache et les étapes suivantes.
+      - name: Resolve browsers path
+        run: echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/pw-browsers" >> "$GITHUB_ENV"
+
+      # Cache des browsers Playwright, clé figée sur la version (chromium-1194).
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/pw-browsers
+          key: playwright-1.56.1-${{ runner.os }}
+
+      - name: Install Chromium (Playwright)
+        run: npx playwright install chromium --no-shell
+
+      - name: Run tests (unit + smoke) under xvfb
+        run: xvfb-run -a npm test
+
+  release-windows:
+    name: Release portable (Windows)
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # Détermine la version à publier : input du workflow, sinon package.json.
+      - name: Resolve version
+        id: version
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="$(node -p "require('./package.json').version")"
+          fi
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Version invalide : '$VERSION' (attendu : semver, ex 0.2.0)"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version à publier : $VERSION (tag v$VERSION)"
+
+      # Garde-fou : refuse d'écraser une release existante.
+      - name: Fail if tag already exists
+        shell: bash
+        run: |
+          git fetch --tags --quiet
+          if git rev-parse -q --verify "refs/tags/${{ steps.version.outputs.tag }}" >/dev/null; then
+            echo "::error::Le tag ${{ steps.version.outputs.tag }} existe déjà — choisis une autre version."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        # Ici Electron DOIT se télécharger (packaging) : pas de skip Electron.
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+      # Aligne package.json sur la version demandée (nom de l'artefact
+      # electron-builder). Le bump n'est pas committé : le tag suffit.
+      - name: Apply version to package.json
+        if: inputs.version != ''
+        shell: bash
+        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Prepare browsers (Chromium 1194 → resources/ms-playwright)
+        run: npm run prepare-browsers
+
+      - name: Build portable .exe
+        run: npm run dist:win
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Playwright Studio ${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          files: dist/*.exe
+          fail_on_unmatched_files: true
+          body: |
+            **Portable Windows x64** — aucun installateur, aucune dépendance : télécharge le `.exe` ci-dessous et lance-le directement. Chromium (Playwright) est embarqué.
