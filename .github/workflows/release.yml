@@ -1,9 +1,17 @@
 name: Release
 
-# Publication d'une release — déclenchement MANUEL uniquement (onglet Actions →
-# "Release" → "Run workflow"). Construit le portable Windows x64 (Chromium
-# Playwright embarqué) et publie une GitHub Release avec le .exe attaché.
+# Publication d'une release — déclenchement MANUEL. Construit le portable
+# Windows x64 (Chromium Playwright embarqué) et publie une GitHub Release avec
+# le .exe attaché. Deux façons de lancer, toutes deux volontaires :
+#   1. Push d'un tag de version `vX.Y.Z` (git tag v0.2.0 && git push origin v0.2.0)
+#      → marche depuis n'importe quelle branche.
+#   2. Bouton "Run workflow" (onglet Actions → Release) → disponible une fois le
+#      workflow présent sur la branche par défaut.
 on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
   workflow_dispatch:
     inputs:
       version:
@@ -78,14 +86,19 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # Détermine la version à publier : input du workflow, sinon package.json.
+      # Détermine la version à publier selon le déclencheur :
+      #   - push d'un tag   → version = le tag sans le 'v' (ex: v0.1.0 → 0.1.0)
+      #   - workflow_dispatch → input 'version', sinon version du package.json
       - name: Resolve version
         id: version
         shell: bash
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ -n "$INPUT_VERSION" ]; then
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${REF_NAME#v}"
+          elif [ -n "$INPUT_VERSION" ]; then
             VERSION="$INPUT_VERSION"
           else
             VERSION="$(node -p "require('./package.json').version")"
@@ -98,8 +111,10 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version à publier : $VERSION (tag v$VERSION)"
 
-      # Garde-fou : refuse d'écraser une release existante.
+      # Garde-fou (bouton manuel uniquement) : refuse d'écraser une release
+      # existante. Sur push de tag, le tag EST le déclencheur : contrôle inutile.
       - name: Fail if tag already exists
+        if: github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           git fetch --tags --quiet
@@ -114,10 +129,9 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
 
-      # Aligne package.json sur la version demandée (nom de l'artefact
-      # electron-builder). Le bump n'est pas committé : le tag suffit.
+      # Aligne package.json sur la version publiée pour que le nom de l'artefact
+      # electron-builder (${version}) corresponde au tag. Bump non committé.
       - name: Apply version to package.json
-        if: inputs.version != ''
         shell: bash
         run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
 
