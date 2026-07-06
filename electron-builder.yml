@@ -3,6 +3,10 @@ productName: Playwright Studio
 
 directories:
   output: dist
+  # Ressources de build. L'icône de l'app est auto-détectée ici : dépose
+  # simplement build/icon.png (PNG carré ≥ 256×256) → electron-builder en fait
+  # l'icône de l'exe Windows. Voir build/README.md. Aucune clé `icon:` explicite
+  # n'est définie exprès : ainsi l'absence du fichier ne casse pas le build.
   buildResources: build
 
 asar: true

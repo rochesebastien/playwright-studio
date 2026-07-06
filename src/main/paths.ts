@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import { app } from 'electron';
 
 /**
@@ -61,6 +62,27 @@ export function getPlaywrightModulePath(): string {
     return resolved.replace('app.asar', 'app.asar.unpacked');
   }
   return resolved;
+}
+
+/**
+ * Chemin de l'icône (logo) de l'application, ou null si aucune icône fournie.
+ *
+ * Fichier à déposer : `build/icon.png` (PNG carré, 256×256 minimum).
+ * - Packaging : electron-builder détecte automatiquement `build/icon.png` (dossier
+ *   `buildResources`) et en fait l'icône de l'exécutable Windows — barre des tâches
+ *   ET fichier .exe. Aucune config à ajouter, et aucune erreur si le fichier est
+ *   absent (retombe sur l'icône par défaut).
+ * - Runtime (dev / plateformes non-Windows) : on l'applique aussi à la fenêtre
+ *   BrowserWindow quand le fichier existe. En packagé Windows, la fenêtre hérite
+ *   déjà de l'icône de l'exe : `build/` n'est pas embarqué → cette fonction renvoie
+ *   null, ce qui est sans effet (l'exe fournit l'icône).
+ *
+ * Tolérant à l'absence : tant que `build/icon.png` n'existe pas, l'app démarre
+ * normalement avec l'icône par défaut, sans planter ni casser le build.
+ */
+export function getAppIconPath(): string | null {
+  const candidate = path.join(repoRoot(), 'build', 'icon.png');
+  return existsSync(candidate) ? candidate : null;
 }
 
 /**

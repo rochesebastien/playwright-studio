@@ -2,11 +2,16 @@ import path from 'node:path';
 import { app, BrowserWindow } from 'electron';
 import { PlaywrightRecorderRunner } from './recorder-runner';
 import { registerIpc } from './ipc';
+import { getAppIconPath } from './paths';
 
 let mainWindow: BrowserWindow | null = null;
 const runner = new PlaywrightRecorderRunner();
 
 function createWindow(): void {
+  // Icône de la fenêtre si un logo est fourni (build/icon.png). Absent → l'app
+  // utilise l'icône par défaut (en packagé Windows, l'exe fournit déjà la sienne).
+  const iconPath = getAppIconPath();
+
   const win = new BrowserWindow({
     width: 1240,
     height: 860,
@@ -14,6 +19,7 @@ function createWindow(): void {
     minHeight: 720,
     show: false,
     autoHideMenuBar: true,
+    ...(iconPath ? { icon: iconPath } : {}),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
