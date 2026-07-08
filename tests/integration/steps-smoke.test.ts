@@ -71,7 +71,12 @@ function waitExit(child: ChildProcess, ms: number): Promise<'exited' | 'timeout'
 
 const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-/** Attend que le fichier existe ET soit non vide, ou timeout. */
+/**
+ * Attend que le fichier existe ET soit non vide, ou timeout.
+ * Poll (au lieu d'un délai fixe) : un runner CI lent — a fortiori quand les deux
+ * smokes lancent leur Chromium en parallèle — peut mettre plus de 15s à booter
+ * Chromium sous xvfb et écrire le fichier --output.
+ */
 async function waitForFile(p: string, ms: number): Promise<string | null> {
   const deadline = Date.now() + ms;
   while (Date.now() < deadline) {
@@ -125,7 +130,9 @@ describe.skipIf(SKIP)('steps smoke (real Playwright 1.56.1)', () => {
 
       try {
         // S0 : contenu du fichier à sa première apparition (capturé par le poller).
-        const s0 = await waitForFile(outPath, 15000);
+        // Budget 30s (aligné sur codegen-smoke) : robuste face à un runner CI lent
+        // qui boote deux Chromium en parallèle sous xvfb.
+        const s0 = await waitForFile(outPath, 30000);
         expect(
           s0,
           `codegen n'a pas produit de fichier. stderr:\n${stderr.slice(-2000)}`,
